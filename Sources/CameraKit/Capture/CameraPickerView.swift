@@ -12,7 +12,7 @@ public protocol CameraSessionDelegate: AnyObject {
     func isReadyToRecord()
     func didStartRecording()
     func didCapture(imageData: Data)
-    func didCapture(videoURL: URL)
+    func didCapture(videoURL: URL, thumbnailImage: UIImage)
     func failed(withError error: Error)
 }
 

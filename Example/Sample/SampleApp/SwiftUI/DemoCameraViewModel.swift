@@ -66,7 +66,7 @@ extension DemoCameraViewModel: CameraSessionDelegate {
         self.startCountdown()
     }
     
-    func didCapture(videoURL: URL) {
+    func didCapture(videoURL: URL, thumbnailImage: UIImage) {
         self.videoUrl = videoURL
         presentPreview = true
         self.state = .preparing

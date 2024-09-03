@@ -81,6 +81,7 @@ public final class CameraViewController: UIViewController {
     private var metalCommandQueue: MTLCommandQueue!
     private var cameraView: MTKView?
     private var currentCIImage: CIImage? { didSet { cameraView?.draw() } }
+    private var firstFrameImage: CIImage?
     
     // MARK: - View lifecycle
     
@@ -222,6 +223,7 @@ extension CameraViewController: CameraSessionController {
     private func startRecording() {
         guard let time = cameraService.cameraCaptureSession?.synchronizationClock?.time else { return }
         state = .initializing
+        firstFrameImage = nil
         Task.detached(priority: .background) { [self, videoRecorder] in
             videoRecorder?.startRecord(sourceTime: time) {
                 Task {
@@ -233,8 +235,9 @@ extension CameraViewController: CameraSessionController {
     
     private func stopRecording(completion: (()->Void)? = nil) {
         state = .saving
-        Task.detached(priority: .userInitiated) { [self, videoRecorder, delegate] in
-            guard let videoUrl = try await videoRecorder?.endRecord()
+        Task.detached(priority: .userInitiated) { [videoRecorder, delegate, firstFrameImage] in
+            guard let videoUrl = try await videoRecorder?.endRecord(),
+                  let firstFrameImage
             else {
                 DispatchQueue.main.async {
                     delegate?.failed(withError: CameraControllerError.recordFailed)
@@ -242,8 +245,9 @@ extension CameraViewController: CameraSessionController {
                 await self.setState(to: .idle)
                 return
             }
+            let thumbnailImage = UIImage(ciImage: firstFrameImage)
             DispatchQueue.main.async {
-                delegate?.didCapture(videoURL: videoUrl)
+                delegate?.didCapture(videoURL: videoUrl, thumbnailImage: thumbnailImage)
             }
         }
     }
@@ -273,6 +277,9 @@ extension CameraViewController: CameraServiceDelegate {
             videoRecorder?.addToRecord(image: filteredImage,
                                        presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer),
                                        applyFilter: nil)
+            if firstFrameImage == nil {
+                self.firstFrameImage = filteredImage
+            }
         }
     }
     

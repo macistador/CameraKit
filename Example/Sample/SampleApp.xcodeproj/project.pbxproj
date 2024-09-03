@@ -15,6 +15,7 @@
 		141CD26E2C7FD1420045CD67 /* VideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141CD26A2C7FD1410045CD67 /* VideoPlayerView.swift */; };
 		141CD26F2C7FD1420045CD67 /* DemoCameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141CD26B2C7FD1420045CD67 /* DemoCameraView.swift */; };
 		145D7DEF2C8097D300D12329 /* DemoCameraViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 145D7DEE2C8097D300D12329 /* DemoCameraViewController.swift */; };
+		145D7DF52C809B2C00D12329 /* CameraKit in Frameworks */ = {isa = PBXBuildFile; productRef = 145D7DF42C809B2C00D12329 /* CameraKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				145D7DF52C809B2C00D12329 /* CameraKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -124,6 +126,7 @@
 			);
 			name = SampleApp;
 			packageProductDependencies = (
+				145D7DF42C809B2C00D12329 /* CameraKit */,
 			);
 			productName = SampleApp;
 			productReference = 141CD2562C7FD0EE0045CD67 /* SampleApp.app */;
@@ -154,6 +157,7 @@
 			);
 			mainGroup = 141CD24D2C7FD0EE0045CD67;
 			packageReferences = (
+				145D7DF32C809B2C00D12329 /* XCRemoteSwiftPackageReference "CameraKit" */,
 			);
 			productRefGroup = 141CD2572C7FD0EE0045CD67 /* Products */;
 			projectDirPath = "";
@@ -411,6 +415,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		145D7DF32C809B2C00D12329 /* XCRemoteSwiftPackageReference "CameraKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/macistador/CameraKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		145D7DF42C809B2C00D12329 /* CameraKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 145D7DF32C809B2C00D12329 /* XCRemoteSwiftPackageReference "CameraKit" */;
+			productName = CameraKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 141CD24E2C7FD0EE0045CD67 /* Project object */;
 }
