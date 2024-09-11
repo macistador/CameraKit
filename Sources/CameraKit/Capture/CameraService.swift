@@ -65,6 +65,19 @@ final class CameraService: NSObject {
             throw CameraServiceError.initializationError
         }
         captureSession.addInput(cameraCaptureInput)
+        if isMicEnabled {
+            let micDevice: AVCaptureDevice?
+            if #available(iOS 17.0, *) {
+                micDevice = AVCaptureDevice.default(.microphone, for: .audio, position: .unspecified)
+            } else {
+                micDevice = AVCaptureDevice.default(.builtInMicrophone, for: .audio, position: .unspecified)
+            }
+            guard let micDevice,
+                  let micDeviceInput = try? AVCaptureDeviceInput(device: micDevice),
+                  captureSession.canAddInput(micDeviceInput) else {
+                throw CameraServiceError.initializationError
+            }
+        }
         switch captureMode {
         case .photo:
             photoOuput = AVCapturePhotoOutput()
@@ -76,7 +89,7 @@ final class CameraService: NSObject {
                 throw CameraServiceError.initializationError
             }
             captureSession.addOutput(photoOuput)
-        case let .video(videoResolution, _):
+        case .video:
             videoDataOutput = AVCaptureVideoDataOutput()
             guard captureSession.canAddOutput(videoDataOutput) else {
                 throw CameraServiceError.initializationError
@@ -89,13 +102,6 @@ final class CameraService: NSObject {
         }
         captureSession.commitConfiguration()
         startSessionIfNeeded()
-    }
-
-    private func startSessionIfNeeded() {
-        guard captureSession != nil else { return }
-        DispatchQueue.global(qos: .userInteractive).async {
-            self.captureSession.startRunning()
-        }
     }
 
     func restartCaptureSession() {
@@ -114,9 +120,17 @@ final class CameraService: NSObject {
     }
 
     func switchCamera() throws {
-        // TODO: do it when the session is runnning
-        cameraDirection = cameraDirection == .front ? .back : .front
-        try setupCameraSession()
+        cameraDirection = switch cameraDirection {
+        case .front:
+                .back
+        case .back:
+                .front
+        }
+        if captureSession.isRunning {
+            // TODO: toggle camera
+        } else {
+            try setupCameraSession()
+        }
     }
 
     func switchTorch() throws {
@@ -126,7 +140,6 @@ final class CameraService: NSObject {
     }
 
     // MARK: - Private methods
-
     private func retrieveCamera(for cameraDirection: CameraDirection) -> AVCaptureDevice? {
         let position: AVCaptureDevice.Position = switch cameraDirection {
         case .back:
@@ -139,6 +152,13 @@ final class CameraService: NSObject {
             mediaType: .video,
             position: position
         ).devices.first
+    }
+
+    private func startSessionIfNeeded() {
+        guard captureSession != nil else { return }
+        DispatchQueue.global(qos: .userInteractive).async {
+            self.captureSession.startRunning()
+        }
     }
 
     // FIXME: doesn't work ??
