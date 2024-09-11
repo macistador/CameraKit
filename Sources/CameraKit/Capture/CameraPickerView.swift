@@ -29,15 +29,15 @@ public struct CameraPickerView: UIViewControllerRepresentable {
     let cameraSessionDelegate: CameraSessionDelegate
     let captureMode: CaptureMode
     let cameraDirection: CameraDirection
-    let captureResolution: CaptureResolution
+    let isMicEnabled: Bool
     let videoFilter: VideoFilter
     let cameraSessionController: (CameraSessionController) -> Void
     
-    public init(cameraSessionDelegate: CameraSessionDelegate, captureMode: CaptureMode, cameraDirection: CameraDirection, captureResolution: CaptureResolution, videoFilter: VideoFilter = VideoFilter.none, cameraSessionController: @escaping (CameraSessionController) -> Void) {
+    public init(cameraSessionDelegate: CameraSessionDelegate, captureMode: CaptureMode, cameraDirection: CameraDirection, isMicEnabled: Bool, videoFilter: VideoFilter = VideoFilter.none, cameraSessionController: @escaping (CameraSessionController) -> Void) {
         self.cameraSessionDelegate = cameraSessionDelegate
         self.captureMode = captureMode
         self.cameraDirection = cameraDirection
-        self.captureResolution = captureResolution
+        self.isMicEnabled = isMicEnabled
         self.videoFilter = videoFilter
         self.cameraSessionController = cameraSessionController
     }
@@ -45,7 +45,7 @@ public struct CameraPickerView: UIViewControllerRepresentable {
     public func makeUIViewController(context: Context) -> CameraViewController {
         let viewController = CameraViewController(captureMode: captureMode,
                                                   cameraDirection: cameraDirection,
-                                                  captureResolution: captureResolution,
+                                                  isMicEnabled: isMicEnabled,
                                                   videoFilter: videoFilter,
                                                   delegate: cameraSessionDelegate)
         cameraSessionController(viewController)

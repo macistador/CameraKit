@@ -5,141 +5,142 @@
 //  Created by Michel-André Chirita on 28/08/2024.
 //
 
-import Foundation
 import AVFoundation
-import MetalKit
 
 protocol CameraServiceDelegate: AnyObject {
     func photoCaptureOutput(imageData: Data)
     func videoCaptureOutput(sampleBuffer: CMSampleBuffer)
 }
 
+enum CameraServiceError: Error {
+    case cantAccessCameraDevice
+    case initializationError
+    case currentCameraNotSet
+    case torchFailed(Error)
+}
+
 final class CameraService: NSObject {
-    
     weak var delegate: CameraServiceDelegate?
-    private var captureMode: CaptureMode
-    /*private*/ let captureResolution: CaptureResolution
+    /*private*/ var captureSession: AVCaptureSession!
+    private let captureMode: CaptureMode
+    private let isMicEnabled: Bool
     private var torchMode: TorchMode = .off
     private var cameraDirection: CameraDirection = .front
-//    private var cameraOrientation: CameraOrientation = .portrait // TODO: to implement
+    private var photoOuput: AVCapturePhotoOutput!
+    private var videoDataOutput: AVCaptureVideoDataOutput!
+    // private var cameraOrientation: CameraOrientation = .portrait // TODO: to implement
+    private var currentCamera: AVCaptureDevice? {
+        return captureSession.inputs
+            .compactMap { $0 as? AVCaptureDeviceInput }
+            .first(where: { $0.device.hasMediaType(.video) })?.device
+    }
 
-    /*private*/ var cameraCaptureSession: AVCaptureSession!
-    private var cameraCaptureInput: AVCaptureInput!
-    private var cameraCapturePhotoOutput: AVCapturePhotoOutput!
-    private var cameraCaptureVideoOutput: AVCaptureVideoDataOutput!
-    private var currentCamera: AVCaptureDevice?
-    
-    init(captureMode: CaptureMode, cameraDirection: CameraDirection, captureResolution: CaptureResolution) {
+    init(captureMode: CaptureMode, cameraDirection: CameraDirection, isMicEnabled: Bool) {
+        self.isMicEnabled = isMicEnabled
         self.captureMode = captureMode
         self.cameraDirection = cameraDirection
-        self.captureResolution = captureResolution
         super.init()
     }
-    
-    // MARK: - Public methods
-    
-    func setupCameraSession() throws {
-        cameraCaptureSession = AVCaptureSession()
-        cameraCaptureSession.beginConfiguration()
-        
-        if cameraCaptureSession.canSetSessionPreset(captureResolution.preset) {
-            cameraCaptureSession.sessionPreset = captureResolution.preset
-        } else {
-            cameraCaptureSession.sessionPreset = .photo
-        }
-        
-        guard let camera = getCamera(for: cameraDirection) else {
-            throw CameraServiceError.cantAccessCameraDevice
-        }
-        currentCamera = camera
-        
-        do {
-            cameraCaptureInput = try AVCaptureDeviceInput(device: camera)
-            cameraCaptureSession.addInputWithNoConnections(cameraCaptureInput)
-            
-            switch captureMode {
-            case .photo:
-                cameraCapturePhotoOutput = AVCapturePhotoOutput()
-                if #available(iOS 17.0, *) {
-                    cameraCapturePhotoOutput.isAutoDeferredPhotoDeliveryEnabled = cameraCapturePhotoOutput.isAutoDeferredPhotoDeliverySupported
-                }
-                if cameraCaptureSession.canAddOutput(cameraCapturePhotoOutput) {
-                    cameraCaptureSession.addOutput(cameraCapturePhotoOutput)
-                }
-                
-            case .video:
-                cameraCaptureVideoOutput = AVCaptureVideoDataOutput()
-    //            cameraCaptureVideoOutput.alwaysDiscardsLateVideoFrames = true
-                cameraCaptureVideoOutput.setSampleBufferDelegate(self, queue: DispatchQueue.global(qos: .default))
-                if cameraCaptureSession.canAddOutput(cameraCaptureVideoOutput) {
-                    cameraCaptureSession.addOutput(cameraCaptureVideoOutput)
-                    cameraCaptureVideoOutput.connection(with: .video)?.videoOrientation = .portrait
-                    cameraCaptureVideoOutput.connection(with: .video)?.isVideoMirrored = cameraDirection == .front
-                }
-            }
-        } catch {
-            throw CameraServiceError.initializationError(error)
-        }
-        
-        cameraCaptureSession.commitConfiguration()
-        currentCamera?.set(frameRate: 24)
 
+    // MARK: - Public methods
+    func setupCameraSession() throws {
+        captureSession = AVCaptureSession()
+        captureSession.beginConfiguration()
+        switch captureMode {
+        case .photo where captureSession.canSetSessionPreset(.photo):
+            captureSession.sessionPreset = .photo
+        case let .video(videoResolution, _) where captureSession.canSetSessionPreset(videoResolution.preset):
+            captureSession.sessionPreset = videoResolution.preset
+        default:
+            throw CameraServiceError.initializationError
+        }
+        guard let camera = retrieveCamera(for: cameraDirection) else {
+            throw CameraServiceError.cantAccessCameraDevice // FIXME: Could we merge it this error with initializationError? => Only 1 guard would be cleaner
+        }
+        if case let .video(_, frameRate) = captureMode, let _ = try? camera.set(frameRate: frameRate) {
+            throw CameraServiceError.initializationError
+        }
+        guard let cameraCaptureInput = try? AVCaptureDeviceInput(device: camera),
+              captureSession.canAddInput(cameraCaptureInput) else {
+            throw CameraServiceError.initializationError
+        }
+        captureSession.addInput(cameraCaptureInput)
+        switch captureMode {
+        case .photo:
+            photoOuput = AVCapturePhotoOutput()
+            // TODO: check if we should do it once the ouput has been added to the session
+            if #available(iOS 17.0, *) {
+                photoOuput.isAutoDeferredPhotoDeliveryEnabled = photoOuput.isAutoDeferredPhotoDeliverySupported
+            }
+            guard captureSession.canAddOutput(photoOuput) else {
+                throw CameraServiceError.initializationError
+            }
+            captureSession.addOutput(photoOuput)
+        case let .video(videoResolution, _):
+            videoDataOutput = AVCaptureVideoDataOutput()
+            guard captureSession.canAddOutput(videoDataOutput) else {
+                throw CameraServiceError.initializationError
+            }
+            // cameraCaptureVideoOutput.alwaysDiscardsLateVideoFrames = true
+            videoDataOutput.setSampleBufferDelegate(self, queue: DispatchQueue.global(qos: .default))
+            captureSession.addOutput(videoDataOutput)
+            videoDataOutput.connection(with: .video)?.videoOrientation = .portrait
+            videoDataOutput.connection(with: .video)?.isVideoMirrored = cameraDirection == .front
+        }
+        captureSession.commitConfiguration()
         startSessionIfNeeded()
     }
-    
+
     private func startSessionIfNeeded() {
-        guard cameraCaptureSession != nil else { return }
+        guard captureSession != nil else { return }
         DispatchQueue.global(qos: .userInteractive).async {
-            self.cameraCaptureSession.startRunning()
+            self.captureSession.startRunning()
         }
     }
-    
+
     func restartCaptureSession() {
-        guard !cameraCaptureSession.isRunning else { return }
+        guard !captureSession.isRunning else { return }
         startSessionIfNeeded()
     }
-    
+
     func stopCaptureSessionIfNeeded() {
-        guard cameraCaptureSession != nil else { return }
-        cameraCaptureSession.stopRunning()
+        guard captureSession != nil else { return }
+        captureSession.stopRunning()
     }
-    
+
     func takePicture() {
         let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
-        cameraCapturePhotoOutput.capturePhoto(with: settings, delegate: self)
+        photoOuput.capturePhoto(with: settings, delegate: self)
     }
-    
+
     func switchCamera() throws {
+        // TODO: do it when the session is runnning
         cameraDirection = cameraDirection == .front ? .back : .front
         try setupCameraSession()
     }
-    
+
     func switchTorch() throws {
         guard let device = currentCamera else { throw CameraServiceError.currentCameraNotSet }
         torchMode = torchMode == .off ? .on : .off
         try updateTorch(for: device, torchMode: torchMode)
     }
-    
+
     // MARK: - Private methods
-    
-    private func getCamera(for cameraDirection: CameraDirection) -> AVCaptureDevice? {
-        let position: AVCaptureDevice.Position
-        switch cameraDirection {
-        case .front: position = .front
-        case .back: position = .back
+
+    private func retrieveCamera(for cameraDirection: CameraDirection) -> AVCaptureDevice? {
+        let position: AVCaptureDevice.Position = switch cameraDirection {
+        case .back:
+                .back
+        case .front:
+                .front
         }
-        
-        let builtInDualCamera = AVCaptureDevice.default(.builtInDualCamera,
-                                                        for: .video,
-                                                        position: position)
-        
-        let builtInWideAngleCamera = AVCaptureDevice.default(.builtInWideAngleCamera,
-                                                             for: .video,
-                                                             position: position)
-        
-        return builtInDualCamera ?? builtInWideAngleCamera ?? nil
+        return AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInTripleCamera, .builtInDualWideCamera, .builtInDualCamera, .builtInWideAngleCamera],
+            mediaType: .video,
+            position: position
+        ).devices.first
     }
-    
+
     // FIXME: doesn't work ??
     private func updateTorch(for device: AVCaptureDevice, torchMode: TorchMode) throws {
         do {
@@ -158,13 +159,13 @@ final class CameraService: NSObject {
 }
 
 extension CameraService: AVCapturePhotoCaptureDelegate {
-    
+
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard output == cameraCapturePhotoOutput,
+        guard output == photoOuput,
               let photoData = photo.fileDataRepresentation()
         else { return }
         delegate?.photoCaptureOutput(imageData: photoData)
-        cameraCaptureSession.stopRunning()
+        captureSession.stopRunning()
     }
 }
 
@@ -176,27 +177,17 @@ extension CameraService: AVCaptureVideoDataOutputSampleBufferDelegate {
 }
 
 private extension AVCaptureDevice {
-    func set(frameRate: Double) {
-        guard let range = activeFormat.videoSupportedFrameRateRanges.first,
-              range.minFrameRate...range.maxFrameRate ~= frameRate
-        else {
-//            print("Requested FPS is not supported by the device's activeFormat !")
-            return
-        }
-        
-        do { try lockForConfiguration()
+
+    func set(frameRate: Double) throws {
+        if let range = activeFormat.videoSupportedFrameRateRanges.first,
+           range.minFrameRate...range.maxFrameRate ~= frameRate {
+            try lockForConfiguration()
             activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate))
             activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate))
             unlockForConfiguration()
-        } catch {
-//            print("LockForConfiguration failed with error: \(error.localizedDescription)")
+        } else {
+            // TODO: find the closest supported FPS rate
+            return
         }
     }
-}
-
-enum CameraServiceError: Error {
-    case cantAccessCameraDevice
-    case initializationError(Error)
-    case currentCameraNotSet
-    case torchFailed(Error)
 }

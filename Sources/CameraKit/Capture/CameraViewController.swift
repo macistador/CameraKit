@@ -22,7 +22,7 @@ public enum CameraDirection: String {
 
 public enum CaptureMode {
     case photo
-    case video
+    case video(resolution: VideoResolution, frameRate: Double)
 }
 
 public enum VideoFilter {
@@ -30,7 +30,7 @@ public enum VideoFilter {
     case removeBackground
 }
 
-public enum CaptureResolution {
+public enum VideoResolution {
     case sd
     case hd
     case fullHd
@@ -47,7 +47,7 @@ public enum CaptureResolution {
         }
     }
     
-    var resolutionSize: CGSize {
+    var size: CGSize {
         return switch self {
         case .sd: CGSize(width: 480, height: 640)
         case .hd: CGSize(width: 720, height: 1280)
@@ -75,7 +75,7 @@ public final class CameraViewController: UIViewController {
     private var cameraService: CameraService
     private var videoRecorder: VideoRecorder?
     private let segmentationService = SegmentationServiceImpl()
-
+    private let captureMode: CaptureMode
     private var context: CIContext?
     private var metalDevice: MTLDevice!
     private var metalCommandQueue: MTLCommandQueue!
@@ -85,12 +85,13 @@ public final class CameraViewController: UIViewController {
     
     // MARK: - View lifecycle
     
-    public init(captureMode: CaptureMode, cameraDirection: CameraDirection, captureResolution: CaptureResolution, videoFilter: VideoFilter = .none, delegate: CameraSessionDelegate) {
+    public init(captureMode: CaptureMode, cameraDirection: CameraDirection, isMicEnabled: Bool, videoFilter: VideoFilter = .none, delegate: CameraSessionDelegate) {
         self.videoFilter = videoFilter
         self.delegate = delegate
+        self.captureMode = captureMode
         self.cameraService = CameraService(captureMode: captureMode,
                                            cameraDirection: cameraDirection,
-                                           captureResolution: captureResolution)
+                                           isMicEnabled: isMicEnabled)
         super.init(nibName: nil, bundle: nil)
         cameraService.delegate = self
     }
@@ -160,9 +161,9 @@ public final class CameraViewController: UIViewController {
     }
         
     private func setupWriter() {
-        guard let context else { return }
+        guard let context, case let .video(resolution, _) = captureMode else { return }
         self.setState(to: .initializing)
-        let settings = RenderSettings(size: cameraService.captureResolution.resolutionSize,
+        let settings = RenderSettings(size: resolution.size,
                                       videoFilename: "Temporary_Camera_Recording")
         videoRecorder = VideoRecorder(renderSettings: settings, context: context)
         videoRecorder?.initialize { [weak self] in
@@ -221,7 +222,7 @@ extension CameraViewController: CameraSessionController {
     }
     
     private func startRecording() {
-        guard let time = cameraService.cameraCaptureSession?.synchronizationClock?.time else { return }
+        guard let time = cameraService.captureSession?.synchronizationClock?.time else { return }
         state = .initializing
         firstFrameImage = nil
         Task.detached(priority: .background) { [self, videoRecorder] in
@@ -260,10 +261,10 @@ extension CameraViewController: CameraServiceDelegate {
     }
 
     func videoCaptureOutput(sampleBuffer: CMSampleBuffer) {
-        guard let imageBuffer = sampleBuffer.imageBuffer else { return }
+        guard let imageBuffer = sampleBuffer.imageBuffer, case let .video(resolution, _) = captureMode else { return }
         let ciImage = CIImage(cvPixelBuffer: imageBuffer)
             .cropped(to: CGRect(origin: .zero,
-                                size: cameraService.captureResolution.resolutionSize))
+                                size: resolution.size))
 
         // Preview image
         let filteredImage = filterIfNeeded(image: ciImage, forPreview: true)
