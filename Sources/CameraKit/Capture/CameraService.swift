@@ -29,10 +29,13 @@ final class CameraService: NSObject {
     private var photoOuput: AVCapturePhotoOutput!
     private var videoDataOutput: AVCaptureVideoDataOutput!
     // private var cameraOrientation: CameraOrientation = .portrait // TODO: to implement
-    private var currentCamera: AVCaptureDevice? {
+    private var currentCameraDeviceInput: AVCaptureDeviceInput? {
         return captureSession.inputs
             .compactMap { $0 as? AVCaptureDeviceInput }
-            .first(where: { $0.device.hasMediaType(.video) })?.device
+            .first(where: { $0.device.hasMediaType(.video) })
+    }
+    private var currentCameraDevice: AVCaptureDevice? {
+        return currentCameraDeviceInput?.device
     }
 
     init(captureMode: CaptureMode, cameraDirection: CameraDirection, isMicEnabled: Bool) {
@@ -54,7 +57,7 @@ final class CameraService: NSObject {
         default:
             throw CameraServiceError.initializationError
         }
-        guard let camera = retrieveCamera(for: cameraDirection) else {
+        guard let camera = retrieveCamera() else {
             throw CameraServiceError.cantAccessCameraDevice // FIXME: Could we merge it this error with initializationError? => Only 1 guard would be cleaner
         }
         if case let .video(_, frameRate) = captureMode, let _ = try? camera.set(frameRate: frameRate) {
@@ -116,16 +119,16 @@ final class CameraService: NSObject {
 
     @discardableResult
     func zoom(to factor: Double) throws -> Double {
-        guard let currentCamera else {
+        guard let currentCameraDevice else {
             throw CameraServiceError.currentCameraNotSet
         }
-        defer { currentCamera.unlockForConfiguration() }
         let factor = min(
-            max(factor, currentCamera.minAvailableVideoZoomFactor),
-            currentCamera.activeFormat.videoMaxZoomFactor
+            max(factor, currentCameraDevice.minAvailableVideoZoomFactor),
+            currentCameraDevice.activeFormat.videoMaxZoomFactor
         )
-        try currentCamera.lockForConfiguration()
-        currentCamera.videoZoomFactor = factor
+        try currentCameraDevice.lockForConfiguration()
+        defer { currentCameraDevice.unlockForConfiguration() }
+        currentCameraDevice.videoZoomFactor = factor
 
         return factor
     }
@@ -143,20 +146,31 @@ final class CameraService: NSObject {
                 .front
         }
         if captureSession.isRunning {
-            // TODO: toggle camera
+            guard let currentCameraDeviceInput,
+                  let newCameraDevice = retrieveCamera() else {
+                throw CameraServiceError.currentCameraNotSet
+            }
+            captureSession.beginConfiguration()
+            defer { captureSession.commitConfiguration() }
+            captureSession.removeInput(currentCameraDeviceInput)
+            guard let newCameraDeviceInput = try? AVCaptureDeviceInput(device: newCameraDevice),
+                  captureSession.canAddInput(newCameraDeviceInput) else {
+                throw CameraServiceError.initializationError
+            }
+            captureSession.addInput(newCameraDeviceInput)
         } else {
             try setupCameraSession()
         }
     }
 
     func switchTorch() throws {
-        guard let device = currentCamera else { throw CameraServiceError.currentCameraNotSet }
+        guard let device = currentCameraDevice else { throw CameraServiceError.currentCameraNotSet }
         torchMode = torchMode == .off ? .on : .off
         try updateTorch(for: device, torchMode: torchMode)
     }
 
     // MARK: - Private methods
-    private func retrieveCamera(for cameraDirection: CameraDirection) -> AVCaptureDevice? {
+    private func retrieveCamera() -> AVCaptureDevice? {
         let position: AVCaptureDevice.Position = switch cameraDirection {
         case .back:
                 .back
