@@ -114,6 +114,22 @@ final class CameraService: NSObject {
         captureSession.stopRunning()
     }
 
+    @discardableResult
+    func zoom(to factor: Double) throws -> Double {
+        guard let currentCamera else {
+            throw CameraServiceError.currentCameraNotSet
+        }
+        defer { currentCamera.unlockForConfiguration() }
+        let factor = min(
+            max(factor, currentCamera.minAvailableVideoZoomFactor),
+            currentCamera.activeFormat.videoMaxZoomFactor
+        )
+        try currentCamera.lockForConfiguration()
+        currentCamera.videoZoomFactor = factor
+
+        return factor
+    }
+
     func takePicture() {
         let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
         photoOuput.capturePhoto(with: settings, delegate: self)
