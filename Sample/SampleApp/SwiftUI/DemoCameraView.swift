@@ -38,11 +38,13 @@ struct DemoCameraView: View {
             .fill(.clear)
             .stroke(.black, lineWidth: 3)
             .overlay {
-                CameraPickerView(cameraSessionDelegate: viewModel,
-                                 captureMode: .video,
-                                 cameraDirection: .front,
-                                 captureResolution: .custom(width: 480, height: 480),
-                                 videoFilter: .removeBackground) { controller in
+                CameraPickerView(
+                    cameraSessionDelegate: viewModel,
+                    captureMode: .video(resolution: .custom(width: 480, height: 480), frameRate: 30),
+                    cameraDirection: .front,
+                    isMicEnabled: false,
+                    videoFilter: .removeBackground
+                ) { controller in
                     viewModel.cameraController = controller
                 }
             }

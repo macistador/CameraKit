@@ -1,15 +1,6 @@
 {
-  "originHash" : "ff30486ee71a01825e92896f3101f4817a0530bcdf66202ab9885fa6a2be32fa",
+  "originHash" : "e8ed0e631bfffaf7ec50487cfb0519ce6389d15c5e699a298c0232b0e3f98a0e",
   "pins" : [
-    {
-      "identity" : "camerakit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/macistador/CameraKit",
-      "state" : {
-        "revision" : "6237c0828dd90ba3b4b63706f61361c8bdf7d935",
-        "version" : "0.0.1"
-      }
-    },
     {
       "identity" : "queue",
       "kind" : "remoteSourceControl",

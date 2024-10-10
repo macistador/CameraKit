@@ -56,6 +56,11 @@ final class DemoCameraViewModel {
 }
 
 extension DemoCameraViewModel: CameraSessionDelegate {
+
+  func didCapture(videoURL: URL) {
+
+  }
+  
     
     func isReadyToRecord() {
         self.state = .readyToRecord
