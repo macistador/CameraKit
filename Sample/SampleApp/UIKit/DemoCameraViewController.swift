@@ -18,11 +18,12 @@ class DemoCameraViewController: UIViewController {
     }
     
     private func setupCamera() {
-        let cameraViewController = CameraViewController(captureMode: .photo,
-                                                        cameraDirection: .back,
-                                                        captureResolution: .uhd4K, 
-                                                        videoFilter: .none,
-                                                        delegate: self)
+        let cameraViewController = CameraViewController(
+            captureMode: .photo,
+            cameraDirection: .back,
+            isMicEnabled: false,
+            delegate: self
+        )
         self.cameraController = cameraViewController
         addChild(cameraViewController)
         cameraViewController.view.frame = view.frame
@@ -32,23 +33,14 @@ class DemoCameraViewController: UIViewController {
 }
 
 extension DemoCameraViewController: CameraSessionDelegate {
-    func isReadyToRecord() {
-        
-    }
-    
-    func didStartRecording() {
-        
-    }
-    
-    func didCapture(imageData: Data) {
-        
-    }
-    
-    func didCapture(videoURL: URL) {
-        
-    }
-    
-    func failed(withError error: any Error) {
-        
-    }
+
+    func isReadyToRecord() {}
+
+    func didStartRecording() {}
+
+    func didCapture(imageData: Data) {}
+
+    func didCapture(videoURL: URL, thumbnailImage: UIImage) {}
+
+    func failed(withError error: Error) {}
 }

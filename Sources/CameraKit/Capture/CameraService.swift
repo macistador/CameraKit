@@ -26,7 +26,7 @@ final class CameraService: NSObject {
     private let isMicEnabled: Bool
     private var torchMode: TorchMode = .off
     private var cameraDirection: CameraDirection = .front
-    private var photoOuput: AVCapturePhotoOutput!
+    private var photoOutput: AVCapturePhotoOutput!
     private var videoDataOutput: AVCaptureVideoDataOutput!
     // private var cameraOrientation: CameraOrientation = .portrait // TODO: to implement
     private var currentCameraDeviceInput: AVCaptureDeviceInput? {
@@ -49,19 +49,16 @@ final class CameraService: NSObject {
     func setupCameraSession() throws {
         captureSession = AVCaptureSession()
         captureSession.beginConfiguration()
-        switch captureMode {
+        captureSession.sessionPreset = switch captureMode {
         case .photo where captureSession.canSetSessionPreset(.photo):
-            captureSession.sessionPreset = .photo
+                .photo
         case let .video(videoResolution, _) where captureSession.canSetSessionPreset(videoResolution.preset):
-            captureSession.sessionPreset = videoResolution.preset
+            videoResolution.preset
         default:
             throw CameraServiceError.initializationError
         }
         guard let camera = retrieveCamera() else {
             throw CameraServiceError.cantAccessCameraDevice // FIXME: Could we merge it this error with initializationError? => Only 1 guard would be cleaner
-        }
-        if case let .video(_, frameRate) = captureMode, let _ = try? camera.set(frameRate: frameRate) {
-            throw CameraServiceError.initializationError
         }
         guard let cameraCaptureInput = try? AVCaptureDeviceInput(device: camera),
               captureSession.canAddInput(cameraCaptureInput) else {
@@ -83,15 +80,15 @@ final class CameraService: NSObject {
         }
         switch captureMode {
         case .photo:
-            photoOuput = AVCapturePhotoOutput()
-            // TODO: check if we should do it once the ouput has been added to the session
+            photoOutput = AVCapturePhotoOutput()
+            // TODO: check if we should do it once the output has been added to the session
             if #available(iOS 17.0, *) {
-                photoOuput.isAutoDeferredPhotoDeliveryEnabled = photoOuput.isAutoDeferredPhotoDeliverySupported
+                photoOutput.isAutoDeferredPhotoDeliveryEnabled = photoOutput.isAutoDeferredPhotoDeliverySupported
             }
-            guard captureSession.canAddOutput(photoOuput) else {
+            guard captureSession.canAddOutput(photoOutput) else {
                 throw CameraServiceError.initializationError
             }
-            captureSession.addOutput(photoOuput)
+            captureSession.addOutput(photoOutput)
         case .video:
             videoDataOutput = AVCaptureVideoDataOutput()
             guard captureSession.canAddOutput(videoDataOutput) else {
@@ -104,6 +101,9 @@ final class CameraService: NSObject {
             videoDataOutput.connection(with: .video)?.isVideoMirrored = cameraDirection == .front
         }
         captureSession.commitConfiguration()
+        if case let .video(_, frameRate) = captureMode, let _ = try? camera.set(frameRate: frameRate) {
+            throw CameraServiceError.initializationError
+        }
         startSessionIfNeeded()
     }
 
@@ -135,7 +135,7 @@ final class CameraService: NSObject {
 
     func takePicture() {
         let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
-        photoOuput.capturePhoto(with: settings, delegate: self)
+        photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
     func switchCamera() throws {
@@ -211,7 +211,7 @@ final class CameraService: NSObject {
 extension CameraService: AVCapturePhotoCaptureDelegate {
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard output == photoOuput,
+        guard output == photoOutput,
               let photoData = photo.fileDataRepresentation()
         else { return }
         delegate?.photoCaptureOutput(imageData: photoData)
