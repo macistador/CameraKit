@@ -58,7 +58,7 @@ final class CameraService: NSObject {
             throw CameraServiceError.initializationError
         }
         guard let camera = retrieveCamera() else {
-            throw CameraServiceError.cantAccessCameraDevice // FIXME: Could we merge it this error with initializationError? => Only 1 guard would be cleaner
+            throw CameraServiceError.cantAccessCameraDevice
         }
         guard let cameraCaptureInput = try? AVCaptureDeviceInput(device: camera),
               captureSession.canAddInput(cameraCaptureInput) else {
@@ -66,11 +66,10 @@ final class CameraService: NSObject {
         }
         captureSession.addInput(cameraCaptureInput)
         if isMicEnabled {
-            let micDevice: AVCaptureDevice?
-            if #available(iOS 17.0, *) {
-                micDevice = AVCaptureDevice.default(.microphone, for: .audio, position: .unspecified)
+            let micDevice: AVCaptureDevice? = if #available(iOS 17.0, *) {
+                AVCaptureDevice.default(.microphone, for: .audio, position: .unspecified)
             } else {
-                micDevice = AVCaptureDevice.default(.builtInMicrophone, for: .audio, position: .unspecified)
+                AVCaptureDevice.default(.builtInMicrophone, for: .audio, position: .unspecified)
             }
             guard let micDevice,
                   let micDeviceInput = try? AVCaptureDeviceInput(device: micDevice),
@@ -81,14 +80,13 @@ final class CameraService: NSObject {
         switch captureMode {
         case .photo:
             photoOutput = AVCapturePhotoOutput()
-            // TODO: check if we should do it once the output has been added to the session
-            if #available(iOS 17.0, *) {
-                photoOutput.isAutoDeferredPhotoDeliveryEnabled = photoOutput.isAutoDeferredPhotoDeliverySupported
-            }
             guard captureSession.canAddOutput(photoOutput) else {
                 throw CameraServiceError.initializationError
             }
             captureSession.addOutput(photoOutput)
+            if #available(iOS 17.0, *) {
+                photoOutput.isAutoDeferredPhotoDeliveryEnabled = photoOutput.isAutoDeferredPhotoDeliverySupported
+            }
         case .video:
             videoDataOutput = AVCaptureVideoDataOutput()
             guard captureSession.canAddOutput(videoDataOutput) else {
@@ -101,8 +99,8 @@ final class CameraService: NSObject {
             videoDataOutput.connection(with: .video)?.isVideoMirrored = cameraDirection == .front
         }
         captureSession.commitConfiguration()
-        if case let .video(_, frameRate) = captureMode, let _ = try? camera.set(frameRate: frameRate) {
-            throw CameraServiceError.initializationError
+        if case let .video(_, frameRate) = captureMode {
+            try camera.set(frameRate: frameRate)
         }
         startSessionIfNeeded()
     }
@@ -196,7 +194,7 @@ final class CameraService: NSObject {
         do {
             try device.lockForConfiguration()
             if (device.torchMode == AVCaptureDevice.TorchMode.on && torchMode == .off) {
-                device.torchMode = AVCaptureDevice.TorchMode.off
+                device.torchMode = .off
             } else {
                 guard device.isTorchModeSupported(.on) else { return }
                 try device.setTorchModeOn(level: AVCaptureDevice.maxAvailableTorchLevel)
@@ -229,15 +227,11 @@ extension CameraService: AVCaptureVideoDataOutputSampleBufferDelegate {
 private extension AVCaptureDevice {
 
     func set(frameRate: Double) throws {
-        if let range = activeFormat.videoSupportedFrameRateRanges.first,
-           range.minFrameRate...range.maxFrameRate ~= frameRate {
-            try lockForConfiguration()
-            activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate))
-            activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate))
-            unlockForConfiguration()
-        } else {
-            // TODO: find the closest supported FPS rate
-            return
-        }
+        guard let frameRateRanges = activeFormat.videoSupportedFrameRateRanges.first else { return }
+        try lockForConfiguration()
+        let closestSupportedFrameRate = min(max(frameRate, frameRateRanges.minFrameRate), frameRateRanges.maxFrameRate)
+        activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: Int32(closestSupportedFrameRate))
+        activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: Int32(closestSupportedFrameRate))
+        unlockForConfiguration()
     }
 }
