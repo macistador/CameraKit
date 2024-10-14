@@ -189,7 +189,6 @@ final class CameraService: NSObject {
         }
     }
 
-    // FIXME: doesn't work ??
     private func updateTorch(for device: AVCaptureDevice, torchMode: TorchMode) throws {
         do {
             try device.lockForConfiguration()

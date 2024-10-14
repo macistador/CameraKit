@@ -1,10 +1,16 @@
 # CameraKit
 Camera framework facilitating capturing photo &amp; video on iOS  
 
+<p align="center">
+  <img src="https://github.com/macistador/CameraKit/blob/main/IconCameraKit.png" width="300" height="300"/>
+</p>
+
+
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Other packages](#other-packages)
 - [Credits](#credits)
 - [License](#license)
 
@@ -16,6 +22,10 @@ Camera framework facilitating capturing photo &amp; video on iOS
 - [x] Builtin background removal filter with fast preview & accurate recording quality
 - [x] Builtin SwiftUI preview view
 - [x] Lightweight
+
+<p align="center">
+  <img src="https://github.com/macistador/CameraKit/blob/main/demo.gif" />
+</p>
 
 ## Requirements
 
@@ -29,7 +39,7 @@ Camera framework facilitating capturing photo &amp; video on iOS
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/macistador/CameraKit", from: "0.0.1")
+    .package(url: "https://github.com/macistador/CameraKit", from: "0.0.2")
 ]
 ```
 
@@ -110,10 +120,26 @@ extension DemoCameraView: CameraSessionDelegate {
 
 For more details you may take a look at the sample project.
 
+## Other packages
+
+Meanwhile this library works well alone, it is meant to be complementary to the following app bootstrap packages suite: 
+
+- [CoreKit](https://github.com/macistador/CoreKit)
+- [DesignKit](https://github.com/macistador/DesignKit)
+- [VisualKit](https://github.com/macistador/VisualKit)
+- [MediasKit](https://github.com/macistador/MediasKit)
+- [CameraKit](https://github.com/macistador/CameraKit)
+- [PermissionsKit](https://github.com/macistador/PermissionsKit)
+- [SocialKit](https://github.com/macistador/SocialKit)
+- [AnalyzeKit](https://github.com/macistador/AnalyzeKit)
+- [IntelligenceKit](https://github.com/macistador/IntelligenceKit)
+- [AdsKit](https://github.com/macistador/AdsKit)
+- [PayKit](https://github.com/macistador/PayKit)
+
 ## Credits
 
 CameraKit is developed and maintained by Michel-André Chirita. You can follow me on Twitter at @Macistador for updates.
 
 ## License
 
-AChain is released under the MIT license. [See LICENSE](https://github.com/macistador/achain/blob/master/LICENSE) for details.
+CameraKit is released under the MIT license. [See LICENSE](https://github.com/macistador/CameraKit/blob/master/LICENSE) for details.
