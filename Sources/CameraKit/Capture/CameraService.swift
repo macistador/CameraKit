@@ -156,6 +156,7 @@ final class CameraService: NSObject {
                 throw CameraServiceError.initializationError
             }
             captureSession.addInput(newCameraDeviceInput)
+            videoDataOutput.connection(with: .video)?.isVideoMirrored = cameraDirection == .front
         } else {
             try setupCameraSession()
         }
